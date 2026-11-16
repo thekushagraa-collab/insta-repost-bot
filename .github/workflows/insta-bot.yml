@@ -1,0 +1,92 @@
+name: insta-bot
+
+on:
+  schedule:
+    # GitHub runs schedules in UTC. India is UTC+5:30.
+    - cron: "30 4 * * *" # 10:00 AM IST -> post one video
+    - cron: "30 13 * * *" # 7:00 PM IST  -> post one video
+    - cron: "10 2 * * 0" # Sunday 7:40 AM IST -> refresh tokens
+  workflow_dispatch:
+    inputs:
+      command:
+        description: What to run
+        type: choice
+        options: [doctor, inventory, post, refresh-tokens]
+        default: doctor
+      dry_run:
+        description: Only show what would be posted (post command)
+        type: boolean
+        default: true
+
+# Never run two at once: both would edit state/state.json.
+concurrency:
+  group: insta-bot
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - name: Choose command
+        id: pick
+        env:
+          EVENT: ${{ github.event_name }}
+          SCHEDULE: ${{ github.event.schedule }}
+          INPUT_COMMAND: ${{ inputs.command }}
+        run: |
+          if [ "$EVENT" = "workflow_dispatch" ]; then
+            command="$INPUT_COMMAND"
+          elif [ "$SCHEDULE" = "10 2 * * 0" ]; then
+            command="refresh-tokens"
+          else
+            command="post"
+          fi
+          case "$command" in doctor|inventory|post|refresh-tokens) ;; *) echo "Unknown command"; exit 1 ;; esac
+          echo "command=$command" >> "$GITHUB_OUTPUT"
+
+      - name: Run bot
+        env:
+          COMMAND: ${{ steps.pick.outputs.command }}
+          OLD_IG_TOKEN: ${{ secrets.OLD_IG_TOKEN }}
+          NEW_IG_TOKEN: ${{ secrets.NEW_IG_TOKEN }}
+          OLD_IG_USERNAME: ${{ vars.OLD_IG_USERNAME }}
+          NEW_IG_USERNAME: ${{ vars.NEW_IG_USERNAME }}
+          # Only the token-refresh run gets the GitHub token.
+          GH_PAT: ${{ steps.pick.outputs.command == 'refresh-tokens' && secrets.GH_PAT || '' }}
+          DRY_RUN: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run || 'false' }}
+        run: npx tsx src/cli.ts "$COMMAND"
+
+      # Runs even if the bot failed, so a half-finished upload is remembered and never posted twice.
+      - name: Save progress
+        if: always()
+        run: |
+          git config user.name "insta-bot"
+          git config user.email "insta-bot@users.noreply.github.com"
+          rm -f state/*.tmp
+          git add state/
+          if git diff --cached --quiet; then
+            echo "No state change."
+            exit 0
+          fi
+          git commit -m "chore: bot state $(date -u +%Y-%m-%dT%H:%MZ) [skip ci]"
+          # Someone may have pushed while the bot ran. Rebase onto it and retry.
+          for attempt in 1 2 3; do
+            git pull --rebase --autostash origin "$GITHUB_REF_NAME" && git push && exit 0
+            echo "Push attempt $attempt failed, retrying."
+            sleep 5
+          done
+          echo "Could not save state. Fix before the next run, or a video may be posted twice."
+          exit 1
