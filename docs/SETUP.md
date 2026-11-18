@@ -27,7 +27,8 @@ This is free and you can switch back later.
 2. **My Apps → Create app**.
 3. Name it something like `Insta Repost Bot`.
 4. For the use case, choose the one about **managing content on Instagram** (the Instagram API).
-5. Finish creating it. Leave the app in **Development** mode. That is enough because only your two accounts will use it, so no App Review is needed.
+5. Meta asks for a **business portfolio** (Meta Business Suite) to finish the Instagram setup. This is free and is **not** a Facebook Page. If it says your Facebook account is too new, wait an hour or two and try again.
+6. Finish creating it. Leave the app in **Development** mode. That is enough because only your two accounts will use it, so no App Review is needed.
 
 ## Step 3: Add both Instagram accounts as testers
 
@@ -37,9 +38,9 @@ This is free and you can switch back later.
 
 ## Step 4: Generate the two tokens
 
-1. In the app: **Instagram → API setup with Instagram login → Generate access tokens → Add account**.
-2. Log in as the **old** account and allow access. Copy its token.
-3. Do the same for the **new** account. Copy its token.
+1. In the app: **Use cases → Customize → API setup with Unified login → 2. Generate access tokens**. Both tester accounts are listed there.
+2. Click **Generate token** next to the **old** account, log in as it and allow access. Copy its token straight into the GitHub secret (step 5).
+3. Do the same for the **new** account.
 
 Tokens are like passwords. Keep them out of chat, email and files that go to GitHub.
 The old account only needs read access (`instagram_business_basic`). The new account also needs `instagram_business_content_publish`.
