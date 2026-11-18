@@ -48,6 +48,63 @@ async function deps(partial: Partial<PostDeps> = {}): Promise<PostDeps> {
   };
 }
 
+describe("runPost with a Facebook-issued token (uploads the file itself)", () => {
+  const bytes = new Uint8Array([1, 2, 3, 4]);
+
+  function facebookNewPage(overrides: Record<string, (options: any, call: number) => unknown> = {}) {
+    const base = newPage({
+      "GET NEW": () => ({ id: "NEW", username: "newpage" }),
+      "POST NEW/media": (_o, call) => ({ id: `c${call}`, uri: "https://rupload.facebook.com/ig-api-upload/v24.0/c1" }),
+      "POST UPLOAD https://rupload.facebook.com/ig-api-upload/v24.0/c1": () => ({ success: true }),
+      ...overrides,
+    });
+    return Object.assign(base, { accountNode: "NEW" });
+  }
+
+  it("downloads the video, creates a resumable container, uploads the bytes, then publishes", async () => {
+    const downloaded: string[] = [];
+    const newClient = facebookNewPage();
+    const d = await deps({
+      newClient,
+      download: async (url) => {
+        downloaded.push(url);
+        return bytes;
+      },
+    });
+
+    await expect(runPost(d)).resolves.toEqual({ kind: "posted", oldMediaId: "v1", newMediaId: "NEWPOST" });
+
+    expect(downloaded).toEqual(["https://cdn.example/v1.mp4"]);
+    const create = newClient.calls.find((c) => c.path === "NEW/media");
+    expect(create?.options.body).toMatchObject({ upload_type: "resumable", media_type: "REELS", caption: "caption v1 #tag" });
+    expect(create?.options.body).not.toHaveProperty("video_url");
+    const upload = newClient.calls.find((c) => c.path.startsWith("UPLOAD "));
+    expect(upload?.options.body).toEqual({ bytes: 4 });
+    expect(newClient.calls.map((c) => c.path)).toEqual([
+      "NEW",
+      "NEW/media",
+      "UPLOAD https://rupload.facebook.com/ig-api-upload/v24.0/c1",
+      "c1",
+      "NEW/media_publish",
+    ]);
+  });
+
+  it("records a failure and tries another video when the download fails", async () => {
+    let calls = 0;
+    const d = await deps({
+      newClient: facebookNewPage(),
+      download: async () => {
+        calls += 1;
+        if (calls === 1) throw new Error("HTTP 403");
+        return bytes;
+      },
+    });
+
+    await expect(runPost(d)).resolves.toMatchObject({ kind: "posted", oldMediaId: "v2" });
+    expect((await loadState(d.statePath)).failures.v1?.lastReason).toContain("HTTP 403");
+  });
+});
+
 describe("runPost", () => {
   it("reposts one video with its caption and cover and remembers it", async () => {
     const d = await deps();

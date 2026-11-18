@@ -48,6 +48,8 @@ export interface RequestOptions {
 }
 
 export interface GraphClient {
+  /** Sends a video file to the rupload.facebook.com address Instagram returned for a resumable container. */
+  upload(uploadUri: string, data: Uint8Array): Promise<void>;
   /** The account node calls are made for: "me" on graph.instagram.com, the Instagram user id on graph.facebook.com. */
   readonly accountNode?: string;
   get<T>(path: string, options?: RequestOptions): Promise<T>;
@@ -135,7 +137,52 @@ export function createGraphClient(options: GraphClientOptions): GraphClient {
     }
   }
 
+  async function uploadOnce(target: URL, data: Uint8Array): Promise<void> {
+    let response: Response;
+    try {
+      response = await fetchImpl(target.toString(), {
+        method: "POST",
+        headers: { Authorization: `OAuth ${options.token}`, offset: "0", file_size: String(data.byteLength) },
+        body: data as unknown as NonNullable<RequestInit["body"]>,
+      });
+    } catch (cause) {
+      const reason = cause instanceof Error ? cause.message : String(cause);
+      throw new GraphApiError(`Network error uploading the video: ${reason}`, 0, undefined, undefined, true);
+    }
+    const text = await response.text();
+    let parsed: (ErrorBody & { debug_info?: { message?: string } }) | undefined;
+    try {
+      parsed = text ? JSON.parse(text) : {};
+    } catch {
+      parsed = undefined;
+    }
+    if (!response.ok || parsed === undefined || parsed.error || parsed.debug_info?.message) {
+      const detail = parsed?.debug_info?.message ?? parsed?.error?.error_user_msg ?? parsed?.error?.message ?? `HTTP ${response.status}`;
+      throw new GraphApiError(`Video upload failed: ${detail}`, response.status, parsed?.error?.code, undefined, response.status >= 500);
+    }
+  }
+
+  async function upload(uploadUri: string, data: Uint8Array): Promise<void> {
+    const target = new URL(uploadUri);
+    // The token is sent to this address, so refuse anything that is not Meta's upload host.
+    if (target.protocol !== "https:" || target.hostname !== "rupload.facebook.com" || !target.pathname.startsWith("/ig-api-upload/")) {
+      throw new GraphApiError("Instagram returned an unexpected upload address. Not sending the video there.", 0);
+    }
+    let attempt = 0;
+    for (;;) {
+      try {
+        return await uploadOnce(target, data);
+      } catch (error) {
+        const retryable = error instanceof GraphApiError && error.isTransient;
+        if (!retryable || attempt >= maxRetries) throw error;
+        attempt += 1;
+        await sleep(BASE_BACKOFF_MS * 2 ** (attempt - 1));
+      }
+    }
+  }
+
   return {
+    upload,
     accountNode: options.accountNode,
     get: (path, requestOptions) => request("GET", path, requestOptions),
     post: (path, requestOptions) => request("POST", path, requestOptions),

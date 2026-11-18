@@ -100,6 +100,43 @@ export async function createReelContainer(client: GraphClient, igUserId: string,
   return result.id;
 }
 
+export interface ResumableContainer {
+  id: string;
+  uploadUri: string;
+}
+
+/**
+ * Facebook-token accounts: create a Reel container that waits for the video bytes.
+ * Instagram's servers often cannot fetch another Instagram CDN link (error 2207076), so we upload the file ourselves.
+ */
+export async function createResumableReelContainer(
+  client: GraphClient,
+  igUserId: string,
+  input: { caption: string; coverUrl?: string },
+): Promise<ResumableContainer> {
+  const body: Record<string, unknown> = {
+    media_type: "REELS",
+    upload_type: "resumable",
+    caption: input.caption,
+    share_to_feed: true,
+  };
+  if (input.coverUrl) body.cover_url = input.coverUrl;
+  const result = await client.post<{ id: string; uri?: string }>(`${igUserId}/media`, { body });
+  if (!result.uri) throw new Error("Instagram did not return an upload address for the video.");
+  return { id: result.id, uploadUri: result.uri };
+}
+
+export type Downloader = (url: string) => Promise<Uint8Array>;
+
+/** Downloads a video file. The old page's CDN links need no login. */
+export const downloadVideo: Downloader = async (url) => {
+  const response = await fetch(url);
+  if (!response.ok) throw new Error(`Could not download the old video (HTTP ${response.status}).`);
+  const bytes = new Uint8Array(await response.arrayBuffer());
+  if (bytes.byteLength === 0) throw new Error("The old video file was empty.");
+  return bytes;
+};
+
 export async function getContainerStatus(client: GraphClient, containerId: string): Promise<ContainerStatus> {
   return client.get<ContainerStatus>(containerId, { params: { fields: "status_code,status" } });
 }

@@ -102,3 +102,53 @@ describe("createGraphClient", () => {
     await expect(client.get("me")).rejects.toThrow("GET me failed: HTTP 400");
   });
 });
+
+describe("upload", () => {
+  const URI = "https://rupload.facebook.com/ig-api-upload/v24.0/c1";
+
+  it("sends the bytes with OAuth auth, offset and file_size", async () => {
+    const fetchImpl = vi.fn<FetchLike>(async () => jsonResponse(200, { success: true }));
+    const { client } = clientWith(fetchImpl);
+
+    await client.upload(URI, new Uint8Array([1, 2, 3]));
+
+    const [url, init] = fetchImpl.mock.calls[0]!;
+    expect(url).toBe(URI);
+    expect(init?.method).toBe("POST");
+    expect(init?.headers).toEqual({ Authorization: `OAuth ${TOKEN}`, offset: "0", file_size: "3" });
+  });
+
+  it("never sends the token to a host other than rupload.facebook.com", async () => {
+    const fetchImpl = vi.fn<FetchLike>(async () => jsonResponse(200, {}));
+    const { client } = clientWith(fetchImpl);
+
+    await expect(client.upload("https://evil.example/ig-api-upload/x", new Uint8Array([1]))).rejects.toThrow("unexpected upload address");
+    await expect(client.upload("http://rupload.facebook.com/ig-api-upload/x", new Uint8Array([1]))).rejects.toThrow("unexpected upload address");
+    expect(fetchImpl).not.toHaveBeenCalled();
+  });
+
+  it("reports Meta's reason without the token", async () => {
+    const fetchImpl = vi.fn<FetchLike>(async () => jsonResponse(400, { debug_info: { message: "Video too long" } }));
+    const { client } = clientWith(fetchImpl);
+
+    const error = await client.upload(URI, new Uint8Array([1])).catch((e: unknown) => e);
+
+    expect(error).toBeInstanceOf(GraphApiError);
+    expect((error as Error).message).toBe("Video upload failed: Video too long");
+    expect((error as Error).message).not.toContain(TOKEN);
+  });
+
+  it("retries a server error and then succeeds", async () => {
+    const fetchImpl = vi
+      .fn<FetchLike>()
+      .mockResolvedValueOnce(jsonResponse(503, {}))
+      .mockResolvedValueOnce(jsonResponse(200, { success: true }));
+    const { client, sleep } = clientWith(fetchImpl);
+
+    await client.upload(URI, new Uint8Array([1]));
+
+    expect(fetchImpl).toHaveBeenCalledTimes(2);
+    expect(sleep).toHaveBeenCalledTimes(1);
+  });
+});
+

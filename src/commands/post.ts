@@ -3,11 +3,14 @@
 import { GraphApiError, type GraphClient } from "../graph";
 import {
   createReelContainer,
+  createResumableReelContainer,
+  downloadVideo,
   getAccount,
   getContainerStatus,
   listAllMedia,
   publishContainer,
   waitForContainer,
+  type Downloader,
   type IgMedia,
   type WaitOptions,
 } from "../instagram";
@@ -28,6 +31,8 @@ export interface PostDeps {
   rng?: Rng;
   now?: () => Date;
   wait?: WaitOptions;
+  /** Fetches the old video's file. Only used for Facebook-token accounts. */
+  download?: Downloader;
 }
 
 export class WrongAccountError extends Error {
@@ -185,16 +190,25 @@ async function publishOne(
   const videoUrl = media.media_url;
   if (!videoUrl) throw new Error("Instagram did not provide this video's file.");
 
+  // Facebook-token accounts upload the file themselves; Instagram-Login accounts hand Instagram the link.
+  const uploadDirectly = deps.newClient.accountNode !== undefined;
+  const videoBytes = uploadDirectly ? await (deps.download ?? downloadVideo)(videoUrl) : undefined;
+
   const prepare = async (coverUrl: string | undefined): Promise<string> => {
-    const containerId = await createReelContainer(deps.newClient, igUserId, {
-      videoUrl,
-      caption: media.caption ?? "",
-      coverUrl,
-    });
+    let containerId: string;
+    let uploadUri: string | undefined;
+    if (videoBytes) {
+      const container = await createResumableReelContainer(deps.newClient, igUserId, { caption: media.caption ?? "", coverUrl });
+      containerId = container.id;
+      uploadUri = container.uploadUri;
+    } else {
+      containerId = await createReelContainer(deps.newClient, igUserId, { videoUrl, caption: media.caption ?? "", coverUrl });
+    }
     state = await persist(
       deps,
       withPending(state, { oldMediaId: media.id, containerId, createdAt: now().toISOString() }),
     );
+    if (videoBytes && uploadUri) await deps.newClient.upload(uploadUri, videoBytes);
     await waitForContainer(deps.newClient, containerId, deps.wait);
     return containerId;
   };

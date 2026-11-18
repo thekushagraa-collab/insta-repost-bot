@@ -5,7 +5,7 @@ import type { GraphClient, RequestOptions } from "../src/graph";
 import type { IgMedia } from "../src/instagram";
 
 export interface RecordedCall {
-  method: "GET" | "POST";
+  method: "GET" | "POST" | "UPLOAD";
   path: string;
   options: RequestOptions;
 }
@@ -27,6 +27,9 @@ export function fakeClient(routes: Record<string, Handler>): GraphClient & { cal
   };
   return {
     calls,
+    upload: async (uploadUri: string, data: Uint8Array) => {
+      await handle("POST", `UPLOAD ${uploadUri}`, { body: { bytes: data.byteLength } });
+    },
     get: <T>(path: string, options?: RequestOptions) => handle("GET", path, options) as Promise<T>,
     post: <T>(path: string, options?: RequestOptions) => handle("POST", path, options) as Promise<T>,
   };
