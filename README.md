@@ -10,7 +10,7 @@ It runs for free on GitHub Actions and uses only Instagram's official API, so th
 | When (India time) | What |
 |---|---|
 | 10:00 AM and 7:00 PM daily | Picks one random old video not posted yet and posts it as a Reel on the new page |
-| Sunday 7:40 AM | Extends both Instagram tokens (they last 60 days) |
+| Sunday 7:40 AM | Extends Instagram Login tokens (`IG...`, 60 days). Facebook-issued `EAA...` system-user tokens never expire, so this does nothing for them |
 
 It remembers what it posted in `state/state.json`, which the workflow commits back after every run, so a video is never posted twice.
 
@@ -32,6 +32,7 @@ To run on your own computer, put the settings in a `.env` file (never commit it)
 | `OLD_IG_TOKEN` | everything | Old page token, `instagram_business_basic` |
 | `NEW_IG_TOKEN` | everything | New page token, plus `instagram_business_content_publish` |
 | `OLD_IG_USERNAME`, `NEW_IG_USERNAME` | recommended | Stops the bot if the two tokens are swapped |
+| `OLD_IG_USER_ID`, `NEW_IG_USER_ID` | tokens starting `EAA` | Instagram account ids (shown next to each account in the Meta app). Not secret |
 | `GH_PAT` | `refresh-tokens` on GitHub | Saves a refreshed token into the repo secrets |
 | `DRY_RUN` | optional | `true` = preview only |
 | `GRAPH_API_VERSION` | optional | default `v24.0` |

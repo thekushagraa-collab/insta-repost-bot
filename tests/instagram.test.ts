@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   ContainerFailedError,
   createReelContainer,
+  getAccount,
   getPublishingLimit,
   listAllMedia,
   refreshToken,
@@ -24,6 +25,19 @@ describe("listAllMedia", () => {
     expect(client.calls[0]?.options.params?.after).toBeUndefined();
     expect(client.calls[1]?.options.params?.after).toBe("CUR1");
     expect(client.calls[0]?.options.params?.fields).toContain("media_url");
+  });
+});
+
+describe("Facebook-issued tokens (account node = Instagram user id)", () => {
+  it("reads the account by id and maps id to user_id", async () => {
+    const client = { ...fakeClient({ "GET 99": () => ({ id: "99", username: "someone", media_count: 7 }) }), accountNode: "99" };
+    await expect(getAccount(client)).resolves.toEqual({ user_id: "99", username: "someone", media_count: 7 });
+  });
+
+  it("lists media from the account id instead of me", async () => {
+    const base = fakeClient({ "GET 99/media": () => ({ data: [video("a")] }) });
+    const media = await listAllMedia({ ...base, accountNode: "99" });
+    expect(media.map((m) => m.id)).toEqual(["a"]);
   });
 });
 

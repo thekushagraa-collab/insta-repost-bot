@@ -45,6 +45,14 @@ describe("runDoctor", () => {
   });
 });
 
+describe("runRefresh with no targets", () => {
+  it("does nothing when every token is a non-expiring system-user token", async () => {
+    const lines: string[] = [];
+    await runRefresh({ targets: [], statePath: await tempStatePath(), log: (l) => lines.push(l), mask: () => undefined });
+    expect(lines.join(" ")).toContain("Nothing to refresh");
+  });
+});
+
 describe("runInventory", () => {
   it("lists what can and cannot be reposted", async () => {
     const lines: string[] = [];
@@ -97,9 +105,9 @@ describe("runRefresh", () => {
 
 describe("loadConfig", () => {
   it("reads tokens and defaults", () => {
-    expect(loadConfig({ OLD_IG_TOKEN: " a ", NEW_IG_TOKEN: "b" })).toEqual({
-      oldToken: "a",
-      newToken: "b",
+    expect(loadConfig({ OLD_IG_TOKEN: " IGa ", NEW_IG_TOKEN: "IGb" })).toEqual({
+      oldToken: "IGa",
+      newToken: "IGb",
       apiVersion: "v24.0",
       statePath: "state/state.json",
       dryRun: false,
@@ -109,8 +117,8 @@ describe("loadConfig", () => {
 
   it("reads overrides", () => {
     const config = loadConfig({
-      OLD_IG_TOKEN: "a",
-      NEW_IG_TOKEN: "b",
+      OLD_IG_TOKEN: "IGa",
+      NEW_IG_TOKEN: "IGb",
       DRY_RUN: "true",
       MAX_ATTEMPTS: "5",
       GRAPH_API_VERSION: "v25.0",
@@ -121,9 +129,18 @@ describe("loadConfig", () => {
     expect(config.newUsername).toBeUndefined();
   });
 
+  it("requires account ids for Facebook-issued tokens and keeps them", () => {
+    expect(() => loadConfig({ OLD_IG_TOKEN: "EAAold", NEW_IG_TOKEN: "EAAnew" })).toThrow("OLD_IG_USER_ID");
+    expect(() => loadConfig({ OLD_IG_TOKEN: "EAAold", NEW_IG_TOKEN: "EAAnew", OLD_IG_USER_ID: "12x", NEW_IG_USER_ID: "2" })).toThrow("digits only");
+    expect(loadConfig({ OLD_IG_TOKEN: "EAAold", NEW_IG_TOKEN: "EAAnew", OLD_IG_USER_ID: "1", NEW_IG_USER_ID: "2" })).toMatchObject({
+      oldUserId: "1",
+      newUserId: "2",
+    });
+  });
+
   it("rejects missing or bad values", () => {
     expect(() => loadConfig({})).toThrow("Missing OLD_IG_TOKEN and NEW_IG_TOKEN");
-    expect(() => loadConfig({ OLD_IG_TOKEN: "a", NEW_IG_TOKEN: "b", MAX_ATTEMPTS: "0" })).toThrow(ConfigError);
-    expect(() => loadConfig({ OLD_IG_TOKEN: "a", NEW_IG_TOKEN: "b", GRAPH_API_VERSION: "24" })).toThrow(ConfigError);
+    expect(() => loadConfig({ OLD_IG_TOKEN: "IGa", NEW_IG_TOKEN: "IGb", MAX_ATTEMPTS: "0" })).toThrow(ConfigError);
+    expect(() => loadConfig({ OLD_IG_TOKEN: "IGa", NEW_IG_TOKEN: "IGb", GRAPH_API_VERSION: "24" })).toThrow(ConfigError);
   });
 });

@@ -11,7 +11,7 @@ import { runInventory } from "./commands/inventory";
 import { runPost } from "./commands/post";
 import { runRefresh, type SecretWriter } from "./commands/refresh";
 import { loadConfig } from "./config";
-import { createGraphClient } from "./graph";
+import { createGraphClient, FACEBOOK_HOST, INSTAGRAM_HOST, isInstagramToken } from "./graph";
 import { errorMessage, log } from "./log";
 
 // Meta's API has known failures over IPv6 on some networks; IPv4 first avoids them.
@@ -54,8 +54,12 @@ async function main(): Promise<number> {
   if (existsSync(".env")) process.loadEnvFile(".env");
 
   const config = loadConfig();
-  const oldClient = createGraphClient({ token: config.oldToken, apiVersion: config.apiVersion });
-  const newClient = createGraphClient({ token: config.newToken, apiVersion: config.apiVersion });
+  const clientFor = (token: string, userId?: string) =>
+    isInstagramToken(token)
+      ? createGraphClient({ token, apiVersion: config.apiVersion, host: INSTAGRAM_HOST })
+      : createGraphClient({ token, apiVersion: config.apiVersion, host: FACEBOOK_HOST, accountNode: userId });
+  const oldClient = clientFor(config.oldToken, config.oldUserId);
+  const newClient = clientFor(config.newToken, config.newUserId);
 
   switch (command) {
     case "doctor": {
@@ -79,10 +83,11 @@ async function main(): Promise<number> {
       return 0;
     case "refresh-tokens":
       await runRefresh({
+        // Facebook-issued system-user tokens never expire, so only Instagram Login tokens need refreshing.
         targets: [
-          { secretName: "OLD_IG_TOKEN", client: oldClient, currentToken: config.oldToken },
-          { secretName: "NEW_IG_TOKEN", client: newClient, currentToken: config.newToken },
-        ],
+          { secretName: "OLD_IG_TOKEN" as const, client: oldClient, currentToken: config.oldToken },
+          { secretName: "NEW_IG_TOKEN" as const, client: newClient, currentToken: config.newToken },
+        ].filter((target) => isInstagramToken(target.currentToken)),
         statePath: config.statePath,
         log,
         writeSecret: githubSecretWriter(),

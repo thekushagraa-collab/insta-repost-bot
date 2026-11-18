@@ -64,6 +64,8 @@ jobs:
           NEW_IG_TOKEN: ${{ secrets.NEW_IG_TOKEN }}
           OLD_IG_USERNAME: ${{ vars.OLD_IG_USERNAME }}
           NEW_IG_USERNAME: ${{ vars.NEW_IG_USERNAME }}
+          OLD_IG_USER_ID: ${{ vars.OLD_IG_USER_ID }}
+          NEW_IG_USER_ID: ${{ vars.NEW_IG_USER_ID }}
           # Only the token-refresh run gets the GitHub token.
           GH_PAT: ${{ steps.pick.outputs.command == 'refresh-tokens' && secrets.GH_PAT || '' }}
           DRY_RUN: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run || 'false' }}

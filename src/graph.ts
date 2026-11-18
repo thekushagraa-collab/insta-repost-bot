@@ -1,8 +1,17 @@
-// Small client for the Instagram API with Instagram Login (graph.instagram.com).
+// Small client for Meta's Graph API. Two kinds of token work:
+//   IG... tokens (Instagram Login)            -> graph.instagram.com, account = "me"
+//   EAA... tokens (Unified / Facebook Login)  -> graph.facebook.com,  account = the Instagram user id
 // The access token travels in the Authorization header, never in a URL, so it
 // cannot leak into logs or error messages.
 
-export const GRAPH_HOST = "https://graph.instagram.com";
+export const INSTAGRAM_HOST = "https://graph.instagram.com";
+export const FACEBOOK_HOST = "https://graph.facebook.com";
+export const GRAPH_HOST = INSTAGRAM_HOST;
+
+/** Instagram Login tokens start with "IG". Anything else (EAA...) is a Facebook-issued token. */
+export function isInstagramToken(token: string): boolean {
+  return token.startsWith("IG");
+}
 
 const DEFAULT_MAX_RETRIES = 3;
 const BASE_BACKOFF_MS = 2_000;
@@ -39,6 +48,8 @@ export interface RequestOptions {
 }
 
 export interface GraphClient {
+  /** The account node calls are made for: "me" on graph.instagram.com, the Instagram user id on graph.facebook.com. */
+  readonly accountNode?: string;
   get<T>(path: string, options?: RequestOptions): Promise<T>;
   post<T>(path: string, options?: RequestOptions): Promise<T>;
 }
@@ -47,6 +58,7 @@ export interface GraphClientOptions {
   token: string;
   apiVersion: string;
   host?: string;
+  accountNode?: string;
   fetchImpl?: FetchLike;
   sleep?: Sleep;
   maxRetries?: number;
@@ -124,6 +136,7 @@ export function createGraphClient(options: GraphClientOptions): GraphClient {
   }
 
   return {
+    accountNode: options.accountNode,
     get: (path, requestOptions) => request("GET", path, requestOptions),
     post: (path, requestOptions) => request("POST", path, requestOptions),
   };

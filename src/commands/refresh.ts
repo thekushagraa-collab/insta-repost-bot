@@ -33,6 +33,10 @@ export class RefreshFailedError extends Error {
 
 export async function runRefresh(deps: RefreshDeps): Promise<void> {
   const failures: string[] = [];
+  if (deps.targets.length === 0) {
+    deps.log("Both tokens are non-expiring system-user tokens. Nothing to refresh.");
+    return;
+  }
 
   for (const target of deps.targets) {
     try {

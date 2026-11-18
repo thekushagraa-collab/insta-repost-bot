@@ -50,13 +50,13 @@ export async function runDoctor(deps: DoctorDeps): Promise<string[]> {
 
   const state = await loadState(deps.statePath);
   deps.log(`Reposted so far: ${Object.keys(state.posted).length}.`);
-  if (state.lastTokenRefreshAt) {
+  if (!state.lastTokenRefreshAt && !deps.oldClient.accountNode && !deps.newClient.accountNode) {
+    deps.log("Tokens have not been refreshed by the bot yet (the weekly job does this).");
+  } else if (state.lastTokenRefreshAt) {
     const now = (deps.now ?? (() => new Date()))();
     const ageDays = Math.floor((now.getTime() - Date.parse(state.lastTokenRefreshAt)) / DAY_MS);
     deps.log(`Tokens last refreshed ${ageDays} days ago.`);
     if (ageDays > TOKEN_LIFETIME_DAYS - 10) problems.push("Tokens have not been refreshed for over 50 days and will expire soon.");
-  } else {
-    deps.log("Tokens have not been refreshed by the bot yet (the weekly job does this).");
   }
 
   for (const problem of problems) deps.log(`PROBLEM: ${problem}`);

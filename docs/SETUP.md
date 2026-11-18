@@ -42,6 +42,8 @@ This is free and you can switch back later.
 2. Click **Generate token** next to the **old** account, log in as it and allow access. Copy its token straight into the GitHub secret (step 5).
 3. Do the same for the **new** account.
 
+Meta now issues tokens starting with `EAA` (never expire). The bot sends those to graph.facebook.com and needs each account's Instagram id, so also add the repository **variables** `OLD_IG_USER_ID` and `NEW_IG_USER_ID` (the number shown under each username in the token list; not secret). If your token starts with `IG`, the ids are not needed.
+
 Tokens are like passwords. Keep them out of chat, email and files that go to GitHub.
 The old account only needs read access (`instagram_business_basic`). The new account also needs `instagram_business_content_publish`.
 

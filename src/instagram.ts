@@ -52,8 +52,20 @@ export class ContainerFailedError extends Error {
   }
 }
 
+function accountNode(client: GraphClient): string {
+  return client.accountNode ?? "me";
+}
+
 export async function getAccount(client: GraphClient): Promise<IgAccount> {
-  return client.get<IgAccount>("me", { params: { fields: "user_id,username,account_type,media_count" } });
+  const node = accountNode(client);
+  if (node === "me") {
+    return client.get<IgAccount>("me", { params: { fields: "user_id,username,account_type,media_count" } });
+  }
+  // graph.facebook.com names the id field "id" and has no account_type (only professional accounts are reachable there).
+  const result = await client.get<{ id: string; username: string; media_count?: number }>(node, {
+    params: { fields: "id,username,media_count" },
+  });
+  return { user_id: result.id, username: result.username, media_count: result.media_count };
 }
 
 interface MediaPage {
@@ -66,7 +78,7 @@ export async function listAllMedia(client: GraphClient): Promise<IgMedia[]> {
   const collected: IgMedia[] = [];
   let after: string | undefined;
   for (let page = 0; page < MAX_PAGES; page += 1) {
-    const result = await client.get<MediaPage>("me/media", {
+    const result = await client.get<MediaPage>(`${accountNode(client)}/media`, {
       params: { fields: MEDIA_FIELDS, limit: PAGE_SIZE, after },
     });
     collected.push(...result.data);
