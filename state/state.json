@@ -1,7 +1,23 @@
 {
   "version": 1,
   "posted": {},
-  "failures": {},
+  "failures": {
+    "17848660068471800": {
+      "count": 1,
+      "lastReason": "Video processing ended with ERROR: Error: Media upload has failed with error code 2207076",
+      "lastAt": "2026-11-18T13:49:44.956Z"
+    },
+    "18049234361197900": {
+      "count": 1,
+      "lastReason": "Video processing ended with ERROR: Error: Media upload has failed with error code 2207076",
+      "lastAt": "2026-11-18T13:50:36.503Z"
+    },
+    "18121746145428149": {
+      "count": 1,
+      "lastReason": "Video processing ended with ERROR: Error: Media upload has failed with error code 2207076",
+      "lastAt": "2026-11-18T13:51:58.132Z"
+    }
+  },
   "pending": null,
   "lastTokenRefreshAt": null
 }
