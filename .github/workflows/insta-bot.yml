@@ -5,16 +5,17 @@ on:
     # GitHub runs schedules in UTC. India is UTC+5:30.
     - cron: "30 4 * * *" # 10:00 AM IST -> post one video
     - cron: "30 13 * * *" # 7:00 PM IST  -> post one video
+    - cron: "30 7 * * *" # 1:00 PM IST -> delete 3 of the previous owner's videos
     - cron: "10 2 * * 0" # Sunday 7:40 AM IST -> refresh tokens
   workflow_dispatch:
     inputs:
       command:
         description: What to run
         type: choice
-        options: [doctor, inventory, post, refresh-tokens]
+        options: [doctor, inventory, post, cleanup, refresh-tokens]
         default: doctor
       dry_run:
-        description: Only show what would be posted (post command)
+        description: Only show what would be posted or deleted (post and cleanup commands)
         type: boolean
         default: true
 
@@ -51,10 +52,12 @@ jobs:
             command="$INPUT_COMMAND"
           elif [ "$SCHEDULE" = "10 2 * * 0" ]; then
             command="refresh-tokens"
+          elif [ "$SCHEDULE" = "30 7 * * *" ]; then
+            command="cleanup"
           else
             command="post"
           fi
-          case "$command" in doctor|inventory|post|refresh-tokens) ;; *) echo "Unknown command"; exit 1 ;; esac
+          case "$command" in doctor|inventory|post|cleanup|refresh-tokens) ;; *) echo "Unknown command"; exit 1 ;; esac
           echo "command=$command" >> "$GITHUB_OUTPUT"
 
       - name: Run bot

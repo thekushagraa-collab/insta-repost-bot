@@ -54,3 +54,23 @@ export function summarizeLibrary(media: readonly IgMedia[], state: BotState): Li
     ),
   };
 }
+
+/** Posts made this long before the bot's first repost are still treated as the bot's own (clock and propagation margin). */
+const FIRST_POST_MARGIN_MS = 60 * 60_000;
+
+/**
+ * The previous owner's videos on the NEW page, oldest first. Only videos that are strictly older than the
+ * bot's first repost are eligible, and anything the bot posted is excluded, so the bot can never delete its own work.
+ * Returns an empty list until the bot has posted at least once.
+ */
+export function pickMediaToDelete(newPageMedia: readonly IgMedia[], state: BotState, limit: number): IgMedia[] {
+  const postedTimes = Object.values(state.posted).map((entry) => Date.parse(entry.postedAt));
+  if (postedTimes.length === 0 || postedTimes.some((time) => Number.isNaN(time))) return [];
+  const cutoff = Math.min(...postedTimes) - FIRST_POST_MARGIN_MS;
+  const ourIds = new Set(Object.values(state.posted).map((entry) => entry.newMediaId));
+
+  return newPageMedia
+    .filter((item) => isVideo(item) && !ourIds.has(item.id) && !state.deleted[item.id] && Date.parse(item.timestamp) < cutoff)
+    .sort((a, b) => Date.parse(a.timestamp) - Date.parse(b.timestamp))
+    .slice(0, limit);
+}

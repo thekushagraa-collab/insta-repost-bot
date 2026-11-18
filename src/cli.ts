@@ -2,10 +2,12 @@
 //   doctor          check both tokens and accounts
 //   inventory       count the old page's videos, list the ones that can't be reposted
 //   post            repost one random video (runs at 10 AM and 7 PM IST)
+//   cleanup         delete the previous owner's 3 oldest videos from the new page (runs daily)
 //   refresh-tokens  extend both tokens (runs weekly)
 import { spawn } from "node:child_process";
 import dns from "node:dns";
 import { existsSync } from "node:fs";
+import { runCleanup } from "./commands/cleanup";
 import { runDoctor } from "./commands/doctor";
 import { runInventory } from "./commands/inventory";
 import { runPost } from "./commands/post";
@@ -17,7 +19,7 @@ import { errorMessage, log } from "./log";
 // Meta's API has known failures over IPv6 on some networks; IPv4 first avoids them.
 dns.setDefaultResultOrder("ipv4first");
 
-const COMMANDS = ["doctor", "inventory", "post", "refresh-tokens"] as const;
+const COMMANDS = ["doctor", "inventory", "post", "cleanup", "refresh-tokens"] as const;
 type Command = (typeof COMMANDS)[number];
 
 function isCommand(value: string | undefined): value is Command {
@@ -81,6 +83,16 @@ async function main(): Promise<number> {
         log,
       });
       return 0;
+    case "cleanup": {
+      const outcome = await runCleanup({
+        newClient,
+        statePath: config.statePath,
+        dryRun: config.dryRun,
+        expectedNewUsername: config.newUsername,
+        log,
+      });
+      return outcome.kind === "refused" ? 1 : 0;
+    }
     case "refresh-tokens":
       await runRefresh({
         // Facebook-issued system-user tokens never expire, so only Instagram Login tokens need refreshing.

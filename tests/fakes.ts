@@ -5,7 +5,7 @@ import type { GraphClient, RequestOptions } from "../src/graph";
 import type { IgMedia } from "../src/instagram";
 
 export interface RecordedCall {
-  method: "GET" | "POST" | "UPLOAD";
+  method: "GET" | "POST" | "DELETE";
   path: string;
   options: RequestOptions;
 }
@@ -16,7 +16,7 @@ type Handler = (options: RequestOptions, call: number) => unknown;
 export function fakeClient(routes: Record<string, Handler>): GraphClient & { calls: RecordedCall[] } {
   const calls: RecordedCall[] = [];
   const counts = new Map<string, number>();
-  const handle = async (method: "GET" | "POST", path: string, options: RequestOptions = {}) => {
+  const handle = async (method: "GET" | "POST" | "DELETE", path: string, options: RequestOptions = {}) => {
     calls.push({ method, path, options });
     const key = `${method} ${path}`;
     const handler = routes[key];
@@ -32,6 +32,7 @@ export function fakeClient(routes: Record<string, Handler>): GraphClient & { cal
     },
     get: <T>(path: string, options?: RequestOptions) => handle("GET", path, options) as Promise<T>,
     post: <T>(path: string, options?: RequestOptions) => handle("POST", path, options) as Promise<T>,
+    delete: <T>(path: string, options?: RequestOptions) => handle("DELETE", path, options) as Promise<T>,
   };
 }
 

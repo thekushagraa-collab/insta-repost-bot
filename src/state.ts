@@ -22,6 +22,11 @@ export interface FailureEntry {
   lastAt: string;
 }
 
+export interface DeletedEntry {
+  deletedAt: string;
+  permalink?: string;
+}
+
 export interface BotState {
   version: 1;
   /** Keyed by the OLD page's media id. */
@@ -30,10 +35,12 @@ export interface BotState {
   /** A container that was created but whose publish result was not saved yet. */
   pending: PendingEntry | null;
   lastTokenRefreshAt: string | null;
+  /** Previous owner's posts the bot has deleted from the new page, keyed by media id. */
+  deleted: Record<string, DeletedEntry>;
 }
 
 export function emptyState(): BotState {
-  return { version: 1, posted: {}, failures: {}, pending: null, lastTokenRefreshAt: null };
+  return { version: 1, posted: {}, failures: {}, pending: null, lastTokenRefreshAt: null, deleted: {} };
 }
 
 export class StateFileError extends Error {
@@ -68,6 +75,7 @@ export function parseState(raw: string): BotState {
     failures: data.failures as BotState["failures"],
     pending: (pending ?? null) as PendingEntry | null,
     lastTokenRefreshAt: typeof data.lastTokenRefreshAt === "string" ? data.lastTokenRefreshAt : null,
+    deleted: isRecord(data.deleted) ? (data.deleted as BotState["deleted"]) : {},
   };
 }
 
@@ -118,4 +126,8 @@ export function withFailure(state: BotState, oldMediaId: string, reason: string,
 
 export function withTokenRefresh(state: BotState, at: string): BotState {
   return { ...state, lastTokenRefreshAt: at };
+}
+
+export function withDeleted(state: BotState, mediaId: string, entry: DeletedEntry): BotState {
+  return { ...state, deleted: { ...state.deleted, [mediaId]: entry } };
 }

@@ -152,3 +152,18 @@ describe("upload", () => {
   });
 });
 
+describe("delete", () => {
+  it("sends DELETE with the token in the header and never retries", async () => {
+    const fetchImpl = vi.fn<FetchLike>(async () => jsonResponse(503, {}));
+    const { client, sleep } = clientWith(fetchImpl);
+
+    await expect(client.delete("123")).rejects.toBeInstanceOf(GraphApiError);
+
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+    expect(sleep).not.toHaveBeenCalled();
+    const [url, init] = fetchImpl.mock.calls[0]!;
+    expect(url).toBe("https://graph.instagram.com/v24.0/123");
+    expect(init?.method).toBe("DELETE");
+    expect((init?.headers as Record<string, string>).Authorization).toBe(`Bearer ${TOKEN}`);
+  });
+});

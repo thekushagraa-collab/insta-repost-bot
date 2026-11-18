@@ -54,6 +54,8 @@ export interface GraphClient {
   readonly accountNode?: string;
   get<T>(path: string, options?: RequestOptions): Promise<T>;
   post<T>(path: string, options?: RequestOptions): Promise<T>;
+  /** Never retried: a lost reply may hide a successful delete. */
+  delete<T>(path: string, options?: RequestOptions): Promise<T>;
 }
 
 export interface GraphClientOptions {
@@ -92,7 +94,7 @@ export function createGraphClient(options: GraphClientOptions): GraphClient {
     return url.toString();
   }
 
-  async function requestOnce<T>(method: "GET" | "POST", path: string, requestOptions: RequestOptions): Promise<T> {
+  async function requestOnce<T>(method: "GET" | "POST" | "DELETE", path: string, requestOptions: RequestOptions): Promise<T> {
     const headers: Record<string, string> = {};
     if (!requestOptions.tokenInQuery) headers.Authorization = `Bearer ${options.token}`;
     let body: string | undefined;
@@ -123,7 +125,7 @@ export function createGraphClient(options: GraphClientOptions): GraphClient {
     return parsed as T;
   }
 
-  async function request<T>(method: "GET" | "POST", path: string, requestOptions: RequestOptions = {}): Promise<T> {
+  async function request<T>(method: "GET" | "POST" | "DELETE", path: string, requestOptions: RequestOptions = {}): Promise<T> {
     let attempt = 0;
     for (;;) {
       try {
@@ -186,6 +188,7 @@ export function createGraphClient(options: GraphClientOptions): GraphClient {
     accountNode: options.accountNode,
     get: (path, requestOptions) => request("GET", path, requestOptions),
     post: (path, requestOptions) => request("POST", path, requestOptions),
+    delete: (path, requestOptions) => request("DELETE", path, { ...requestOptions, retry: false }),
   };
 }
 

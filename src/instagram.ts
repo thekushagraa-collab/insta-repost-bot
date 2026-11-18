@@ -100,6 +100,12 @@ export async function createReelContainer(client: GraphClient, igUserId: string,
   return result.id;
 }
 
+/** Permanently deletes one post. Needs the instagram_manage_contents permission on a Facebook-issued token. */
+export async function deleteMedia(client: GraphClient, mediaId: string): Promise<void> {
+  const result = await client.delete<{ success?: boolean }>(mediaId);
+  if (result.success === false) throw new Error("Instagram reported that the delete did not succeed.");
+}
+
 export interface ResumableContainer {
   id: string;
   uploadUri: string;
