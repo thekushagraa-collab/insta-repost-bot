@@ -28,5 +28,19 @@
     }
   },
   "pending": null,
-  "lastTokenRefreshAt": null
+  "lastTokenRefreshAt": null,
+  "deleted": {
+    "17844868254408817": {
+      "deletedAt": "2026-11-18T14:16:13.788Z",
+      "permalink": "https://www.instagram.com/reel/DFkdXFzyXSw/"
+    },
+    "18483913990023539": {
+      "deletedAt": "2026-11-18T14:16:15.782Z",
+      "permalink": "https://www.instagram.com/reel/DFks1DHSRYN/"
+    },
+    "18050116919173859": {
+      "deletedAt": "2026-11-18T14:16:17.927Z",
+      "permalink": "https://www.instagram.com/reel/DFnPS-dS6Y-/"
+    }
+  }
 }
