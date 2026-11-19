@@ -105,6 +105,26 @@ describe("runPost with a Facebook-issued token (uploads the file itself)", () =>
   });
 });
 
+describe("one post per slot", () => {
+  it("does nothing a second time in the same slot", async () => {
+    const d = await deps();
+    await expect(runPost(d)).resolves.toMatchObject({ kind: "posted" });
+    await expect(runPost(d)).resolves.toEqual({ kind: "already-posted" });
+  });
+
+  it("posts again in the next slot", async () => {
+    const d = await deps();
+    await runPost(d);
+    await expect(runPost({ ...d, now: () => new Date("2026-11-17T13:30:00Z") })).resolves.toMatchObject({ kind: "posted" });
+  });
+
+  it("treats the small hours as part of the previous evening's slot", async () => {
+    const d = await deps({ now: () => new Date("2026-11-17T14:00:00Z") });
+    await runPost(d);
+    await expect(runPost({ ...d, now: () => new Date("2026-11-17T22:00:00Z") })).resolves.toEqual({ kind: "already-posted" });
+  });
+});
+
 describe("runPost", () => {
   it("reposts one video with its caption and cover and remembers it", async () => {
     const d = await deps();

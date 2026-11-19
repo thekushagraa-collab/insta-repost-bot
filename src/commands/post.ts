@@ -16,6 +16,7 @@ import {
 } from "../instagram";
 import { errorMessage, type Logger } from "../log";
 import { pickRandomUnposted, type Rng } from "../select";
+import { currentPostSlotStart } from "../slots";
 import { loadState, saveState, withFailure, withPending, withPosted, type BotState } from "../state";
 
 export interface PostDeps {
@@ -52,6 +53,7 @@ export type PostOutcome =
   | { kind: "posted"; oldMediaId: string; newMediaId: string }
   | { kind: "recovered"; oldMediaId: string; newMediaId: string }
   | { kind: "dry-run"; oldMediaId: string }
+  | { kind: "already-posted" }
   | { kind: "exhausted" };
 
 export class PostFailedError extends Error {
@@ -89,6 +91,13 @@ export async function runPost(deps: PostDeps): Promise<PostOutcome> {
   const recovery = await resolvePending(deps, state, newAccount.user_id);
   state = recovery.state;
   if (recovery.outcome) return recovery.outcome;
+
+  // One post per slot. A retried or duplicated run (GitHub sometimes starts runs late or twice) must not post again.
+  const slotStart = currentPostSlotStart(now());
+  if (Object.values(state.posted).some((entry) => Date.parse(entry.postedAt) >= slotStart.getTime())) {
+    deps.log("Already posted for this time slot. Nothing to do.");
+    return { kind: "already-posted" };
+  }
 
   const library = await listAllMedia(deps.oldClient);
   const triedThisRun = new Set<string>();

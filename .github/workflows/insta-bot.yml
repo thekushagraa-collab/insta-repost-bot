@@ -3,9 +3,11 @@ name: insta-bot
 on:
   schedule:
     # GitHub runs schedules in UTC. India is UTC+5:30.
-    - cron: "30 4 * * *" # 10:00 AM IST -> post one video
-    - cron: "30 13 * * *" # 7:00 PM IST  -> post one video
-    - cron: "30 7 * * *" # 1:00 PM IST -> delete 3 of the previous owner's videos
+    # GitHub sometimes starts scheduled runs very late or skips them. The bot posts once per slot and deletes at most
+    # 3 videos per day, so the extra ticks below are harmless when the first run worked and a safety net when it did not.
+    - cron: "30 4,6,8 * * *" # 10:00, 12:00, 14:00 IST -> morning post (once)
+    - cron: "30 13,15,17 * * *" # 19:00, 21:00, 23:00 IST -> evening post (once)
+    - cron: "30 7,9 * * *" # 13:00, 15:00 IST -> delete 3 of the previous owner's videos (once a day)
     - cron: "10 2 * * 0" # Sunday 7:40 AM IST -> refresh tokens
   workflow_dispatch:
     inputs:
@@ -52,7 +54,7 @@ jobs:
             command="$INPUT_COMMAND"
           elif [ "$SCHEDULE" = "10 2 * * 0" ]; then
             command="refresh-tokens"
-          elif [ "$SCHEDULE" = "30 7 * * *" ]; then
+          elif [ "$SCHEDULE" = "30 7,9 * * *" ]; then
             command="cleanup"
           else
             command="post"

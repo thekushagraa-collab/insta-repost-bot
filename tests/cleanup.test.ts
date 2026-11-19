@@ -109,6 +109,20 @@ describe("runCleanup", () => {
     expect(client.calls.filter((c) => c.method === "DELETE").map((c) => c.path)).toEqual(["old1", "old2"]);
   });
 
+  it("deletes at most 3 per India day even if started again", async () => {
+    const d = await deps();
+    await runCleanup(d);
+    const again = await runCleanup({ ...d, newClient: page([OURS, OLD(4)]) });
+    expect(again).toEqual({ kind: "already-done-today" });
+  });
+
+  it("only tops up to 3 when some were already deleted today", async () => {
+    const d = await deps();
+    const state = await loadState(d.statePath);
+    await saveState(d.statePath, { ...state, deleted: { old1: { deletedAt: "2026-11-19T01:00:00.000Z" } } });
+    await expect(runCleanup(d)).resolves.toEqual({ kind: "deleted", ids: ["old2", "old3"] });
+  });
+
   it("says so when there is nothing left", async () => {
     const d = await deps({ newClient: page([OURS]) });
     await expect(runCleanup(d)).resolves.toEqual({ kind: "nothing-to-delete" });

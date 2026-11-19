@@ -4,6 +4,7 @@ import type { GraphClient } from "../graph";
 import { deleteMedia, getAccount, listAllMedia } from "../instagram";
 import { errorMessage, type Logger } from "../log";
 import { pickMediaToDelete } from "../select";
+import { istDayStart } from "../slots";
 import { loadState, saveState, withDeleted } from "../state";
 
 export const DELETES_PER_RUN = 3;
@@ -21,6 +22,7 @@ export interface CleanupDeps {
 export type CleanupOutcome =
   | { kind: "deleted"; ids: string[] }
   | { kind: "dry-run"; ids: string[] }
+  | { kind: "already-done-today" }
   | { kind: "nothing-to-delete" }
   | { kind: "refused"; reason: string };
 
@@ -36,8 +38,17 @@ function clean(name: string): string {
 }
 
 export async function runCleanup(deps: CleanupDeps): Promise<CleanupOutcome> {
-  const limit = deps.limit ?? DELETES_PER_RUN;
+  const dailyLimit = deps.limit ?? DELETES_PER_RUN;
   let state = await loadState(deps.statePath);
+
+  // At most `dailyLimit` deletes per India day, however many times this run is started.
+  const dayStart = istDayStart((deps.now ?? (() => new Date()))()).getTime();
+  const deletedToday = Object.values(state.deleted).filter((entry) => Date.parse(entry.deletedAt) >= dayStart).length;
+  const limit = dailyLimit - deletedToday;
+  if (limit <= 0) {
+    deps.log(`Already deleted ${deletedToday} videos today. Nothing to do.`);
+    return { kind: "already-done-today" };
+  }
 
   if (Object.keys(state.posted).length === 0) {
     const reason = "The bot has not reposted anything yet, so it cannot tell the previous owner's videos from its own. Deleting nothing.";
